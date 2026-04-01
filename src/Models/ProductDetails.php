@@ -22,7 +22,16 @@ class ProductDetails
         public readonly ?string $amazon = null,
         public readonly ?string $model = null,
         public readonly ?string $mpn = null,
-        public readonly ?string $color = null
+        public readonly ?string $color = null,
+        public readonly ?string $titleShort = null,
+        public readonly ?string $slug = null,
+        public readonly ?string $description = null,
+        public readonly ?array $categories = null,
+        public readonly ?array $attributes = null,
+        public readonly ?array $rating = null,
+        public readonly ?array $score = null,
+        public readonly ?array $keywords = null,
+        public readonly ?array $identifiers = null
     ) {
     }
 
@@ -44,7 +53,16 @@ class ProductDetails
             $data['amazon'] ?? null,
             $data['model'] ?? null,
             $data['mpn'] ?? null,
-            $data['color'] ?? null
+            $data['color'] ?? null,
+            $data['title_short'] ?? null,
+            $data['slug'] ?? null,
+            $data['description'] ?? null,
+            $data['categories'] ?? null,
+            $data['attributes'] ?? null,
+            $data['rating'] ?? null,
+            $data['score'] ?? null,
+            $data['keywords'] ?? null,
+            $data['identifiers'] ?? null
         );
     }
 

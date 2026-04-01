@@ -46,7 +46,7 @@ use ShopSavvy\SDK\Models\UsageInfo;
  */
 class ShopSavvyClient
 {
-    public const VERSION = '1.0.1';
+    public const VERSION = '1.1.0';
     private const DEFAULT_BASE_URL = 'https://api.shopsavvy.com/v1';
     private const API_KEY_PATTERN = '/^ss_(live|test)_[a-zA-Z0-9]+$/';
 
@@ -285,6 +285,28 @@ class ShopSavvyClient
     public function getUsage(): ApiResponse
     {
         return $this->executeRequest('GET', '/usage');
+    }
+
+    /**
+     * Browse current shopping deals
+     *
+     * @param array<string, mixed> $params Query parameters (sort, limit, offset, category, retailer, tag, min_price, max_price, grade)
+     * @return array<string, mixed> Deals response
+     */
+    public function getDeals(array $params = []): array
+    {
+        return $this->executeRequestRaw('GET', '/deals', $params);
+    }
+
+    /**
+     * Get TLDR review for a product
+     *
+     * @param string $identifier Product identifier (barcode, ASIN, URL, model number)
+     * @return array<string, mixed> Review response
+     */
+    public function getProductReview(string $identifier): array
+    {
+        return $this->executeRequestRaw('GET', '/products/reviews', ['id' => $identifier]);
     }
 
     // MARK: - Private Methods
