@@ -309,6 +309,28 @@ class ShopSavvyClient
         return $this->executeRequestRaw('GET', '/products/reviews', ['id' => $identifier]);
     }
 
+    /**
+     * Look up multiple products at once (sync for <=20, async for >20)
+     *
+     * @param array<string> $identifiers Product identifiers (max 100)
+     * @param array<string>|null $include Optional extras: ["offers"], ["reviews"]
+     * @return array<string, mixed> Batch results
+     */
+    public function batchLookup(array $identifiers, ?array $include = null): array
+    {
+        $body = ['identifiers' => $identifiers];
+        if ($include !== null) $body['include'] = $include;
+        return $this->executeRequestRaw('POST', '/products/batch', [], $body);
+    }
+
+    /**
+     * Poll for async batch job results
+     */
+    public function getBatchStatus(string $batchId): array
+    {
+        return $this->executeRequestRaw('GET', "/batch/{$batchId}");
+    }
+
     // MARK: - Private Methods
 
     /**
