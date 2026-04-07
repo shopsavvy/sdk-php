@@ -331,6 +331,26 @@ class ShopSavvyClient
         return $this->executeRequestRaw('GET', "/batch/{$batchId}");
     }
 
+    public function createWebhook(string $url, array $events): array
+    {
+        return $this->executeRequestRaw('POST', '/webhooks', [], ['url' => $url, 'events' => $events]);
+    }
+
+    public function listWebhooks(): array
+    {
+        return $this->executeRequestRaw('GET', '/webhooks');
+    }
+
+    public function testWebhook(string $webhookId): array
+    {
+        return $this->executeRequestRaw('POST', "/webhooks/{$webhookId}/test");
+    }
+
+    public function deleteWebhook(string $webhookId): array
+    {
+        return $this->executeRequestRaw('DELETE', "/webhooks/{$webhookId}");
+    }
+
     // MARK: - Private Methods
 
     /**
