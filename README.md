@@ -26,19 +26,6 @@ $bestOffer = collect($offers->data)->sortBy('price')->first();
 echo "{$product->data->name} - Best price: \${$bestOffer->price} at {$bestOffer->retailer}";
 ```
 
-## 📊 Feature Comparison
-
-| Feature | Free Tier | Pro | Enterprise |
-|---------|-----------|-----|-----------| 
-| **API Calls/Month** | 1,000 | 100,000 | Unlimited |
-| **Product Details** | ✅ | ✅ | ✅ |
-| **Real-time Pricing** | ✅ | ✅ | ✅ |
-| **Price History** | 30 days | 1 year | 5+ years |
-| **Bulk Operations** | 10/batch | 100/batch | 1000/batch |
-| **Retailer Coverage** | 50+ | 500+ | 1000+ |
-| **Rate Limiting** | 60/hour | 1000/hour | Custom |
-| **Support** | Community | Email | Phone + Dedicated |
-
 ## 🚀 Installation & Setup
 
 ### Requirements
