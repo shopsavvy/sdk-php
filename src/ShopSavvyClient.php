@@ -346,6 +346,29 @@ class ShopSavvyClient
         return $this->executeRequestRaw('POST', "/webhooks/{$webhookId}/test");
     }
 
+    /**
+     * Update a webhook. All parameters are optional, but at least one of
+     * $url, $events, or $isActive must be provided.
+     *
+     * @param string $webhookId
+     * @param string|null $url
+     * @param array<int, string>|null $events
+     * @param bool|null $isActive
+     * @return array<string, mixed>
+     * @throws ShopSavvyException
+     */
+    public function updateWebhook(string $webhookId, ?string $url = null, ?array $events = null, ?bool $isActive = null): array
+    {
+        if ($url === null && $events === null && $isActive === null) {
+            throw new \InvalidArgumentException('updateWebhook requires at least one of $url, $events, or $isActive');
+        }
+        $body = [];
+        if ($url !== null) $body['url'] = $url;
+        if ($events !== null) $body['events'] = $events;
+        if ($isActive !== null) $body['is_active'] = $isActive;
+        return $this->executeRequestRaw('PUT', "/webhooks/{$webhookId}", [], $body);
+    }
+
     public function deleteWebhook(string $webhookId): array
     {
         return $this->executeRequestRaw('DELETE', "/webhooks/{$webhookId}");
