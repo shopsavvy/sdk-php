@@ -29,6 +29,12 @@ class ProductDetails
         public readonly ?array $categories = null,
         public readonly ?array $attributes = null,
         public readonly ?array $rating = null,
+        /**
+         * Expert quality scores on a 0-1 scale (multiply by 10 or 100 for
+         * display): "overall", "customer", "professional", plus an "aspects"
+         * array keyed by free-form aspect names from the product's
+         * professional reviews.
+         */
         public readonly ?array $score = null,
         public readonly ?array $keywords = null,
         public readonly ?array $identifiers = null
