@@ -210,10 +210,14 @@ class ShopSavvyClient
         ?string $retailer = null,
         ?string $format = null
     ): ApiResponse {
+        // Wire params are 'start'/'end' — what GET /products/offers/history
+        // reads, and what the OpenAPI spec and public docs document. The old
+        // 'start_date'/'end_date' names came from the MCP tool's argument
+        // convention (a different interface entirely) and 400'd every call.
         $query = [
             'ids' => $identifier,
-            'start_date' => $startDate,
-            'end_date' => $endDate,
+            'start' => $startDate,
+            'end' => $endDate,
         ];
         if ($retailer !== null) {
             $query['retailer'] = $retailer;
