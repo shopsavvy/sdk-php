@@ -1,6 +1,6 @@
 {
     "name": "shopsavvy/shopsavvy-sdk-php",
-    "version": "1.2.0",
+    "version": "1.3.0",
     "description": "Official PHP SDK for ShopSavvy Data API - Access product data, pricing, and price history",
     "keywords": ["shopsavvy", "product-data", "pricing", "e-commerce", "api-client"],
     "homepage": "https://shopsavvy.com/data",

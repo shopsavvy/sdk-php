@@ -93,9 +93,15 @@ class Offer
  */
 class PriceHistoryEntry
 {
+    /**
+     * @param string|null $currency ISO 4217 code $price is denominated in. Null on an archived
+     *   point with no recorded currency - never assume a missing value means USD
+     *   (ShopSavvy prospector-audit d5-t3-1).
+     */
     public function __construct(
         public readonly string $timestamp,
         public readonly float $price,
+        public readonly ?string $currency = null,
         public readonly ?string $availability = null
     ) {
     }
@@ -111,6 +117,7 @@ class PriceHistoryEntry
         return new self(
             $data['timestamp'],
             $data['price'],
+            $data['currency'] ?? null,
             $data['availability'] ?? null
         );
     }
