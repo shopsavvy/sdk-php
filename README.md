@@ -100,14 +100,23 @@ $several = $client->getCurrentOffersBatch(['611247373064', 'B0788F3R8X']);
 
 ```php
 $response = $client->getPriceHistory('611247373064', '2026-01-01', '2026-01-31');
+$amazonOnly = $client->getPriceHistory('611247373064', '2026-01-01', '2026-01-31', 'amazon.com');
 
+// $response is a PriceHistoryResponse. `data` holds one ProductWithPriceHistory per product
+// found (all the product fields, plus `offers`); each OfferWithHistory carries a `history`
+// list of PriceHistoryEntry points, newest first.
 foreach ($response->data as $product) {
-    foreach ($product['offers'] as $offer) {
-        foreach ($offer['history'] ?? [] as $point) {
-            echo "{$offer['retailer']} {$point['timestamp']}: {$point['price']} {$point['currency']}\n";
+    echo "{$product->title} ({$product->barcode})\n";
+    foreach ($product->offers as $offer) {
+        foreach ($offer->history as $point) {
+            // $point->currency is null on the rare archived point with no recorded currency;
+            // $point->availability is null when it was unknown.
+            echo "  {$offer->retailer} {$point->timestamp}: {$point->price} {$point->currency}\n";
         }
     }
 }
+
+echo "Credits used: {$response->creditsUsed()}\n";
 ```
 
 ### Scheduled monitoring
