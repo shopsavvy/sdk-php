@@ -6,6 +6,9 @@ namespace ShopSavvy\SDK\Models;
 
 /**
  * Request model for removing scheduled products
+ *
+ * @deprecated Not used by the client and not a shape the API sends or reads:
+ *   the endpoint reads only the `ids` query parameter; removeProductFromSchedule() sends it.
  */
 class RemoveRequest
 {

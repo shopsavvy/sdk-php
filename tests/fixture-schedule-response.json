@@ -1,0 +1,34 @@
+{
+  "success": true,
+  "data": [
+    {
+      "title": "Keurig K-Mini Single Serve Coffee Maker, Black",
+      "category": "Home & Kitchen",
+      "brand": "Keurig",
+      "color": "Black",
+      "shopsavvy": "products/3ONn300xybP3y66ibqc1",
+      "barcode": "611247373064",
+      "amazon": "B07GV2S1GS",
+      "model": "K-Mini",
+      "mpn": "5000200237",
+      "images": ["https://images.example/keurig-1.jpg", "https://images.example/keurig-2.jpg"],
+      "title_short": "Keurig K-Mini",
+      "slug": "keurig-k-mini-single-serve-coffee-maker-black",
+      "rating": { "value": 4.5, "count": 81234 },
+      "identifiers": { "amazon": "B07GV2S1GS", "barcode": "611247373064" },
+      "schedule": "hourly",
+      "retailer": "amazon.com"
+    },
+    {
+      "title": "Echo Dot (4th Gen)",
+      "category": null,
+      "brand": "Amazon",
+      "shopsavvy": "products/Q2x9AbCdEf",
+      "amazon": "B08N5WRWNW",
+      "images": [],
+      "schedule": "hourly",
+      "retailer": "amazon.com"
+    }
+  ],
+  "meta": { "request_id": "req-sched-1", "credits_used": 2, "credits_remaining": 998, "rate_limit_remaining": 59 }
+}

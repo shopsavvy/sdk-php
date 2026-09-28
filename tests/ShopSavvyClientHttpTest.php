@@ -21,6 +21,10 @@ use ShopSavvy\SDK\Models\PriceHistoryEntry;
 use ShopSavvy\SDK\Models\PriceHistoryResponse;
 use ShopSavvy\SDK\Models\ProductWithPriceHistory;
 use ShopSavvy\SDK\Models\ProductDetails;
+use ShopSavvy\SDK\Models\RemoveResponse;
+use ShopSavvy\SDK\Models\ScheduledProduct;
+use ShopSavvy\SDK\Models\ScheduledProductsResponse;
+use ShopSavvy\SDK\Models\ScheduleResponse;
 use ShopSavvy\SDK\ShopSavvyClient;
 
 /**
@@ -255,7 +259,9 @@ class ShopSavvyClientHttpTest extends TestCase
 
     public function testScheduleSendsQueryParametersWithPut(): void
     {
-        $client = $this->client([self::json(['success' => true, 'data' => [['title' => 'x', 'schedule' => 'daily']]])]);
+        $client = $this->client([self::json(['success' => true, 'data' => [
+            ['title' => 'Keurig K-Mini', 'shopsavvy' => 'products/3ONn300xybP3y66ibqc1', 'schedule' => 'daily', 'retailer' => 'amazon.com'],
+        ]])]);
         $client->scheduleProductMonitoring('611247373064', 'daily', 'amazon.com');
 
         $request = $this->lastRequest();
@@ -314,6 +320,163 @@ class ShopSavvyClientHttpTest extends TestCase
         $this->assertSame('DELETE', $this->lastRequest()->getMethod());
         $this->assertSame('/v1/products/scheduled', $this->lastRequest()->getUri()->getPath());
         $this->assertSame(['ids' => '611247373064'], $this->lastQuery());
+    }
+
+    /**
+     * PUT /products/scheduled answers `{ success, data: [ { ...product, schedule, retailer? } ], meta }`
+     * (refinery entrypoint-api.ts `schedule`).
+     */
+    public function testScheduleParsesScheduledProductsWithEveryProductField(): void
+    {
+        $client = $this->client([self::fixture('fixture-schedule-response.json')]);
+
+        $response = $client->scheduleProductMonitoring('611247373064,B08N5WRWNW', 'hourly', 'amazon.com');
+
+        $this->assertInstanceOf(ScheduleResponse::class, $response);
+        $this->assertTrue($response->success);
+        $this->assertCount(2, $response->data);
+        $this->assertContainsOnlyInstancesOf(ScheduledProduct::class, $response->data);
+        $this->assertContainsOnlyInstancesOf(ProductDetails::class, $response->data);
+
+        $keurig = $response->data[0];
+        $this->assertSame('Keurig K-Mini Single Serve Coffee Maker, Black', $keurig->title);
+        $this->assertSame('products/3ONn300xybP3y66ibqc1', $keurig->shopsavvy);
+        $this->assertSame('611247373064', $keurig->barcode);
+        $this->assertSame('B07GV2S1GS', $keurig->amazon);
+        $this->assertSame('K-Mini', $keurig->model);
+        $this->assertSame('5000200237', $keurig->mpn);
+        $this->assertSame('Keurig', $keurig->brand);
+        $this->assertSame('Black', $keurig->color);
+        $this->assertSame(['https://images.example/keurig-1.jpg', 'https://images.example/keurig-2.jpg'], $keurig->images);
+        $this->assertSame('Keurig K-Mini', $keurig->titleShort);
+        $this->assertSame(['value' => 4.5, 'count' => 81234], $keurig->rating);
+        $this->assertSame('hourly', $keurig->schedule);
+        $this->assertSame('hourly', $keurig->getFrequency());
+        $this->assertTrue($keurig->isHourly());
+        $this->assertFalse($keurig->isDaily());
+        $this->assertSame('amazon.com', $keurig->retailer);
+
+        $echo = $response->data[1];
+        $this->assertSame('products/Q2x9AbCdEf', $echo->shopsavvy);
+        $this->assertNull($echo->category);
+        $this->assertNull($echo->barcode);
+        $this->assertSame([], $echo->images);
+        $this->assertSame('amazon.com', $echo->retailer);
+
+        $this->assertSame(2, $response->creditsUsed());
+        $this->assertSame(998, $response->creditsRemaining());
+        $this->assertSame(59, $response->meta?->rateLimitRemaining);
+    }
+
+    /**
+     * DELETE /products/scheduled answers `{ success, message, meta }` — no `data`
+     * (refinery entrypoint-api.ts `unschedule`).
+     */
+    public function testUnscheduleParsesSuccessMessageAndMeta(): void
+    {
+        $client = $this->client([self::fixture('fixture-unschedule-response.json')]);
+
+        $response = $client->removeProductFromSchedule('611247373064');
+
+        $this->assertInstanceOf(RemoveResponse::class, $response);
+        $this->assertTrue($response->success);
+        $this->assertSame('Products successfully removed from schedule', $response->message);
+        $this->assertNotNull($response->meta);
+        $this->assertSame(0, $response->meta->creditsUsed);
+        $this->assertSame(0, $response->meta->creditsRemaining);
+        $this->assertSame(0, $response->meta->rateLimitRemaining);
+    }
+
+    /**
+     * GET /products/scheduled answers `{ success, data: [ { ...product, schedule?, retailer? } ], meta }`;
+     * `schedule` is omitted for an interval with no Data API label and `retailer` when there is none
+     * (refinery entrypoint-api.ts `scheduled`).
+     */
+    public function testScheduledListParsesEntriesWithOptionalScheduleAndRetailer(): void
+    {
+        $client = $this->client([self::fixture('fixture-scheduled-list-response.json')]);
+
+        $response = $client->getScheduledProducts();
+
+        $this->assertSame('GET', $this->lastRequest()->getMethod());
+        $this->assertSame('/v1/products/scheduled', $this->lastRequest()->getUri()->getPath());
+        $this->assertInstanceOf(ScheduledProductsResponse::class, $response);
+        $this->assertTrue($response->success);
+        $this->assertContainsOnlyInstancesOf(ScheduledProduct::class, $response->data);
+        $this->assertSame(
+            ['products/3ONn300xybP3y66ibqc1', 'products/Q2x9AbCdEf', 'products/Zz81Sony'],
+            array_map(fn(ScheduledProduct $p) => $p->shopsavvy, $response->data)
+        );
+        $this->assertSame(['daily', 'weekly', null], array_map(fn(ScheduledProduct $p) => $p->schedule, $response->data));
+        $this->assertSame(['bestbuy.com', null, null], array_map(fn(ScheduledProduct $p) => $p->retailer, $response->data));
+
+        [$keurig, $echo, $sony] = $response->data;
+        $this->assertTrue($keurig->isDaily());
+        $this->assertSame('Keurig K-Mini Single Serve Coffee Maker, Black', $keurig->title);
+        $this->assertSame('611247373064', $keurig->barcode);
+        $this->assertTrue($echo->isWeekly());
+        $this->assertSame('B08N5WRWNW', $echo->amazon);
+        $this->assertFalse($sony->isHourly());
+        $this->assertFalse($sony->isDaily());
+        $this->assertFalse($sony->isWeekly());
+        $this->assertSame('027242923232', $sony->barcode);
+        $this->assertSame(0, $response->creditsUsed());
+    }
+
+    /**
+     * `format=csv` makes the endpoints answer text/csv. The client used to JSON-decode every
+     * body, so each CSV call threw "Failed to decode JSON response".
+     */
+    public function testCsvFormatReturnsTheRawCsvText(): void
+    {
+        $productsCsv = "shopsavvy,barcode,amazon,title,category,brand,color,mpn,model,image\r\n"
+            . "products/3ONn300xybP3y66ibqc1,611247373064,B07GV2S1GS,\"Keurig K-Mini, 6-12oz\",Home & Kitchen,Keurig,Black,5000200237,K-Mini,https://images.example/keurig-1.jpg\r\n";
+        $offersCsv = "shopsavvy,barcode,title,currency-Amazon,price-Amazon,availability-Amazon\r\n"
+            . "products/3ONn300xybP3y66ibqc1,611247373064,Keurig K-Mini,USD,58.86,in\r\n";
+        $historyCsv = "date,retailer,price,currency,availability\r\n2026-01-02T00:00:00.000Z,Amazon,58.86,USD,in\r\n";
+        $csv = fn(string $body) => new Response(200, ['Content-Type' => 'text/csv; charset=utf-8'], $body);
+
+        $client = $this->client([
+            $csv($productsCsv), $csv($productsCsv), $csv($offersCsv), $csv($offersCsv), $csv($historyCsv),
+        ]);
+
+        $this->assertSame($productsCsv, $client->getProductDetails('611247373064', 'csv'));
+        $this->assertSame(['ids' => '611247373064', 'format' => 'csv'], $this->lastQuery());
+        $this->assertSame($productsCsv, $client->getProductDetailsBatch(['611247373064', 'B0788F3R8X'], 'csv'));
+        $this->assertSame($offersCsv, $client->getCurrentOffers('611247373064', 'amazon.com', 'csv'));
+        $this->assertSame(['ids' => '611247373064', 'retailer' => 'amazon.com', 'format' => 'csv'], $this->lastQuery());
+        $this->assertSame($offersCsv, $client->getCurrentOffersBatch(['611247373064', 'B0788F3R8X'], null, 'csv'));
+        $this->assertSame(['ids' => '611247373064,B0788F3R8X', 'format' => 'csv'], $this->lastQuery());
+        $this->assertSame($historyCsv, $client->getPriceHistory('611247373064', '2026-01-01', '2026-01-31', null, 'csv'));
+        $this->assertSame(
+            ['ids' => '611247373064', 'start' => '2026-01-01', 'end' => '2026-01-31', 'format' => 'csv'],
+            $this->lastQuery()
+        );
+    }
+
+    public function testJsonFormatStillReturnsTypedResponses(): void
+    {
+        $client = $this->client([
+            self::json(['success' => true, 'data' => [['title' => 'Keurig K-Mini', 'shopsavvy' => 'products/3ONn300xybP3y66ibqc1']]]),
+            self::json(['success' => true, 'data' => []]),
+        ]);
+
+        $details = $client->getProductDetails('611247373064', 'json');
+        $this->assertInstanceOf(ApiResponse::class, $details);
+        $this->assertSame('Keurig K-Mini', $details->data[0]['title']);
+
+        $history = $client->getPriceHistory('611247373064', '2026-01-01', '2026-01-31', null, 'json');
+        $this->assertInstanceOf(PriceHistoryResponse::class, $history);
+    }
+
+    private static function fixture(string $name): Response
+    {
+        $body = file_get_contents(__DIR__ . '/' . $name);
+        if ($body === false) {
+            throw new \RuntimeException("Missing fixture $name");
+        }
+
+        return new Response(200, ['Content-Type' => 'application/json'], $body);
     }
 
     public function testDealsPassThroughParameters(): void

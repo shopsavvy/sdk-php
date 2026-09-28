@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace ShopSavvy\SDK\Models;
 
 /**
- * Response from scheduleProductMonitoring() (PUT /products/scheduled):
- * `{ success, data: [ product + schedule + retailer? ], meta }`.
+ * Response from getScheduledProducts() (GET /products/scheduled):
+ * `{ success, data: [ product + schedule? + retailer? ], meta }`.
  *
- * `data` holds one ScheduledProduct per identifier that resolved to a product (unknown
- * identifiers are skipped and not charged); `retailer` is set only when one was passed.
- * Earlier releases modelled this as `{scheduled, product_id}`, which the API never sends.
+ * `data` holds every product scheduled under this API key, oldest first. An entry's
+ * `schedule` is null when its interval has no Data API label, and `retailer` is null
+ * when it is watched at every retailer.
  */
-class ScheduleResponse
+class ScheduledProductsResponse
 {
     /**
      * @param array<ScheduledProduct> $data
@@ -26,7 +26,7 @@ class ScheduleResponse
     }
 
     /**
-     * Create ScheduleResponse from the decoded response body
+     * Create ScheduledProductsResponse from the decoded response body
      *
      * @param array<string, mixed> $data
      * @return self

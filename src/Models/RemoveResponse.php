@@ -5,17 +5,23 @@ declare(strict_types=1);
 namespace ShopSavvy\SDK\Models;
 
 /**
- * Response model for removal operations
+ * Response from removeProductFromSchedule() (DELETE /products/scheduled):
+ * `{ success, message, meta }`.
+ *
+ * The server sends no `data`. Earlier releases modelled this as `{removed}`, which the
+ * API never sends.
  */
 class RemoveResponse
 {
     public function __construct(
-        public readonly bool $removed
+        public readonly bool $success,
+        public readonly ?string $message = null,
+        public readonly ?ApiMeta $meta = null
     ) {
     }
 
     /**
-     * Create RemoveResponse from array data
+     * Create RemoveResponse from the decoded response body
      *
      * @param array<string, mixed> $data
      * @return self
@@ -23,7 +29,9 @@ class RemoveResponse
     public static function fromArray(array $data): self
     {
         return new self(
-            $data['removed']
+            $data['success'] ?? true,
+            $data['message'] ?? null,
+            isset($data['meta']) ? ApiMeta::fromArray($data['meta']) : null
         );
     }
 }

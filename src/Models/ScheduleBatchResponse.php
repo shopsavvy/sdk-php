@@ -6,6 +6,9 @@ namespace ShopSavvy\SDK\Models;
 
 /**
  * Response from batch scheduling
+ *
+ * @deprecated Not used by the client and not a shape the API sends or reads:
+ *   scheduleProductMonitoring() returns ScheduleResponse, whose `data` lists every scheduled product.
  */
 class ScheduleBatchResponse
 {

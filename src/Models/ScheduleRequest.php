@@ -6,6 +6,9 @@ namespace ShopSavvy\SDK\Models;
 
 /**
  * Request model for scheduling product monitoring
+ *
+ * @deprecated Not used by the client and not a shape the API sends or reads:
+ *   the endpoint reads only the query parameters `ids`, `schedule` and `retailer`; scheduleProductMonitoring() sends them.
  */
 class ScheduleRequest
 {

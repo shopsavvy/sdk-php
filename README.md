@@ -96,6 +96,17 @@ $several = $client->getCurrentOffersBatch(['611247373064', 'B0788F3R8X']);
 // ['id', 'retailer', 'price', 'availability' ('in' | 'out'), 'condition' ('new' | 'used' | 'refurbished'), 'seller', 'URL', 'timestamp']
 ```
 
+### CSV
+
+`getProductDetails`, `getProductDetailsBatch`, `getCurrentOffers`, `getCurrentOffersBatch` and
+`getPriceHistory` accept a `$format` of `'csv'`. The API then answers `text/csv`, and these methods
+return the raw CSV text as a `string` instead of a response object:
+
+```php
+$csv = $client->getCurrentOffers('611247373064', null, 'csv');   // string
+file_put_contents('offers.csv', $csv);
+```
+
 ### Price history
 
 ```php
@@ -122,9 +133,31 @@ echo "Credits used: {$response->creditsUsed()}\n";
 ### Scheduled monitoring
 
 ```php
-$client->scheduleProductMonitoring('611247373064', 'daily');            // 'hourly', 'daily' or 'weekly'
-$scheduled = $client->getScheduledProducts();
-$client->removeProductFromSchedule('611247373064');
+// PUT /products/scheduled — 'hourly', 'daily' or 'weekly'; a comma-separated list schedules several
+$result = $client->scheduleProductMonitoring('611247373064', 'daily');
+$amazonOnly = $client->scheduleProductMonitoring('611247373064,B08N5WRWNW', 'hourly', 'amazon.com');
+
+// $result is a ScheduleResponse; `data` holds one ScheduledProduct per product found.
+// A ScheduledProduct is a ProductDetails (title, shopsavvy, barcode, ...) plus `schedule`
+// and `retailer` (set only when the schedule is limited to one retailer).
+foreach ($result->data as $product) {
+    echo "{$product->title} ({$product->shopsavvy}): {$product->schedule}\n";
+}
+echo "Credits used: {$result->creditsUsed()}\n";
+
+// GET /products/scheduled — a ScheduledProductsResponse with every scheduled product.
+// `schedule` is null for an interval with no Data API label; `retailer` is null when the
+// product is watched at every retailer.
+foreach ($client->getScheduledProducts()->data as $product) {
+    $where = $product->retailer ?? 'all retailers';
+    echo "{$product->title}: " . ($product->schedule ?? 'custom interval') . " at {$where}\n";
+}
+
+// DELETE /products/scheduled — a RemoveResponse with `success`, `message` and `meta` (no data)
+$removed = $client->removeProductFromSchedule('611247373064');
+if ($removed->success) {
+    echo $removed->message . "\n";   // "Products successfully removed from schedule"
+}
 ```
 
 ### Deals

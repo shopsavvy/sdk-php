@@ -21,6 +21,7 @@ use ShopSavvy\SDK\Models\Offer;
 use ShopSavvy\SDK\Models\PriceHistoryResponse;
 use ShopSavvy\SDK\Models\ScheduleResponse;
 use ShopSavvy\SDK\Models\ScheduledProduct;
+use ShopSavvy\SDK\Models\ScheduledProductsResponse;
 use ShopSavvy\SDK\Models\RemoveResponse;
 use ShopSavvy\SDK\Models\UsageInfo;
 
@@ -118,17 +119,17 @@ class ShopSavvyClient
      *
      * @param string $identifier Product identifier (barcode, ASIN, URL, model number, or ShopSavvy product ID)
      * @param string|null $format Response format ('json' or 'csv')
-     * @return ApiResponse Product details
+     * @return ApiResponse|string Product details; with $format 'csv', the raw CSV text
      * @throws ShopSavvyException if the API request fails
      */
-    public function getProductDetails(string $identifier, ?string $format = null): ApiResponse
+    public function getProductDetails(string $identifier, ?string $format = null): ApiResponse|string
     {
         $query = ['ids' => $identifier];
         if ($format !== null) {
             $query['format'] = $format;
         }
 
-        return $this->executeRequest('GET', '/products', $query);
+        return $this->executeRequestJsonOrCsv('GET', '/products', $query, $format);
     }
 
     /**
@@ -136,17 +137,17 @@ class ShopSavvyClient
      *
      * @param array<string> $identifiers List of product identifiers
      * @param string|null $format Response format ('json' or 'csv')
-     * @return ApiResponse List of product details
+     * @return ApiResponse|string List of product details; with $format 'csv', the raw CSV text
      * @throws ShopSavvyException if the API request fails
      */
-    public function getProductDetailsBatch(array $identifiers, ?string $format = null): ApiResponse
+    public function getProductDetailsBatch(array $identifiers, ?string $format = null): ApiResponse|string
     {
         $query = ['ids' => implode(',', $identifiers)];
         if ($format !== null) {
             $query['format'] = $format;
         }
 
-        return $this->executeRequest('GET', '/products', $query);
+        return $this->executeRequestJsonOrCsv('GET', '/products', $query, $format);
     }
 
     // MARK: - Current Offers
@@ -157,10 +158,10 @@ class ShopSavvyClient
      * @param string $identifier Product identifier
      * @param string|null $retailer Optional retailer to filter by
      * @param string|null $format Response format ('json' or 'csv')
-     * @return ApiResponse Current offers
+     * @return ApiResponse|string Current offers; with $format 'csv', the raw CSV text
      * @throws ShopSavvyException if the API request fails
      */
-    public function getCurrentOffers(string $identifier, ?string $retailer = null, ?string $format = null): ApiResponse
+    public function getCurrentOffers(string $identifier, ?string $retailer = null, ?string $format = null): ApiResponse|string
     {
         $query = ['ids' => $identifier];
         if ($retailer !== null) {
@@ -170,7 +171,7 @@ class ShopSavvyClient
             $query['format'] = $format;
         }
 
-        return $this->executeRequest('GET', '/products/offers', $query);
+        return $this->executeRequestJsonOrCsv('GET', '/products/offers', $query, $format);
     }
 
     /**
@@ -179,10 +180,11 @@ class ShopSavvyClient
      * @param array<string> $identifiers List of product identifiers
      * @param string|null $retailer Optional retailer to filter by
      * @param string|null $format Response format ('json' or 'csv')
-     * @return ApiResponse Map of identifiers to their offers
+     * @return ApiResponse|string One product per identifier found, each with its `offers`;
+     *   with $format 'csv', the raw CSV text
      * @throws ShopSavvyException if the API request fails
      */
-    public function getCurrentOffersBatch(array $identifiers, ?string $retailer = null, ?string $format = null): ApiResponse
+    public function getCurrentOffersBatch(array $identifiers, ?string $retailer = null, ?string $format = null): ApiResponse|string
     {
         $query = ['ids' => implode(',', $identifiers)];
         if ($retailer !== null) {
@@ -192,7 +194,7 @@ class ShopSavvyClient
             $query['format'] = $format;
         }
 
-        return $this->executeRequest('GET', '/products/offers', $query);
+        return $this->executeRequestJsonOrCsv('GET', '/products/offers', $query, $format);
     }
 
     // MARK: - Price History
@@ -209,7 +211,8 @@ class ShopSavvyClient
      * @param string $endDate End date (YYYY-MM-DD format)
      * @param string|null $retailer Optional retailer domain to filter by (e.g. 'amazon.com')
      * @param string|null $format Response format ('json' or 'csv')
-     * @return PriceHistoryResponse Products, each with its offers and their price history
+     * @return PriceHistoryResponse|string Products, each with its offers and their price history;
+     *   with $format 'csv', the raw CSV text (one row per price point)
      * @throws ShopSavvyException if the API request fails
      */
     public function getPriceHistory(
@@ -218,7 +221,7 @@ class ShopSavvyClient
         string $endDate,
         ?string $retailer = null,
         ?string $format = null
-    ): PriceHistoryResponse {
+    ): PriceHistoryResponse|string {
         // Wire params are 'start'/'end' — what GET /products/offers/history
         // reads, and what the OpenAPI spec and public docs document. The old
         // 'start_date'/'end_date' names came from the MCP tool's argument
@@ -233,6 +236,10 @@ class ShopSavvyClient
         }
         if ($format !== null) {
             $query['format'] = $format;
+        }
+
+        if ($format === 'csv') {
+            return $this->executeRequestBody('GET', '/products/offers/history', $query);
         }
 
         // Typed per product, not per offer: `data` is a list of products, each with
@@ -252,13 +259,16 @@ class ShopSavvyClient
      * query parameters only; a JSON body (what this method used to send) is
      * ignored, so every call failed with "'ids' is required".
      *
+     * Several products can be scheduled at once by passing a comma-separated list.
+     *
      * @param string $identifier Product identifier
      * @param string $frequency How often to refresh ('hourly', 'daily', 'weekly')
      * @param string|null $retailer Optional retailer to monitor
-     * @return ApiResponse The scheduled products (each product with its `schedule`)
+     * @return ScheduleResponse One ScheduledProduct per product found (every product field
+     *   plus `schedule`, and `retailer` when one was given)
      * @throws ShopSavvyException if the API request fails
      */
-    public function scheduleProductMonitoring(string $identifier, string $frequency, ?string $retailer = null): ApiResponse
+    public function scheduleProductMonitoring(string $identifier, string $frequency, ?string $retailer = null): ScheduleResponse
     {
         $query = [
             'ids' => $identifier,
@@ -268,18 +278,19 @@ class ShopSavvyClient
             $query['retailer'] = $retailer;
         }
 
-        return $this->executeRequest('PUT', '/products/scheduled', $query);
+        return ScheduleResponse::fromArray($this->executeRequestRaw('PUT', '/products/scheduled', $query));
     }
 
     /**
      * Get all scheduled products
      *
-     * @return ApiResponse List of scheduled products
+     * @return ScheduledProductsResponse Every scheduled product (product fields plus `schedule`,
+     *   null for an interval with no Data API label, and `retailer`, null when watched everywhere)
      * @throws ShopSavvyException if the API request fails
      */
-    public function getScheduledProducts(): ApiResponse
+    public function getScheduledProducts(): ScheduledProductsResponse
     {
-        return $this->executeRequest('GET', '/products/scheduled');
+        return ScheduledProductsResponse::fromArray($this->executeRequestRaw('GET', '/products/scheduled'));
     }
 
     /**
@@ -288,12 +299,12 @@ class ShopSavvyClient
      * Sends DELETE /products/scheduled?ids= (query parameters, like scheduling).
      *
      * @param string $identifier Product identifier to remove
-     * @return ApiResponse Removal confirmation
+     * @return RemoveResponse Removal confirmation: `success`, `message` and `meta` (no data)
      * @throws ShopSavvyException if the API request fails
      */
-    public function removeProductFromSchedule(string $identifier): ApiResponse
+    public function removeProductFromSchedule(string $identifier): RemoveResponse
     {
-        return $this->executeRequest('DELETE', '/products/scheduled', ['ids' => $identifier]);
+        return RemoveResponse::fromArray($this->executeRequestRaw('DELETE', '/products/scheduled', ['ids' => $identifier]));
     }
 
     // MARK: - Usage
@@ -430,6 +441,26 @@ class ShopSavvyClient
     }
 
     /**
+     * Execute a request that may ask for `format=csv`.
+     *
+     * With format 'csv' the endpoint answers `text/csv`, not JSON; decoding that as JSON
+     * threw "Failed to decode JSON response" on every call, so the CSV text is returned
+     * as-is instead.
+     *
+     * @param array<string, string> $query Query parameters
+     * @return ApiResponse|string
+     * @throws ShopSavvyException if the request fails
+     */
+    private function executeRequestJsonOrCsv(string $method, string $endpoint, array $query, ?string $format): ApiResponse|string
+    {
+        if ($format === 'csv') {
+            return $this->executeRequestBody($method, $endpoint, $query);
+        }
+
+        return $this->executeRequest($method, $endpoint, $query);
+    }
+
+    /**
      * Execute an HTTP request and return raw array
      *
      * @param string $method HTTP method
@@ -440,6 +471,31 @@ class ShopSavvyClient
      * @throws ShopSavvyException if the request fails
      */
     private function executeRequestRaw(string $method, string $endpoint, array $query = [], ?array $body = null): array
+    {
+        $responseBody = $this->executeRequestBody($method, $endpoint, $query, $body);
+
+        $data = json_decode($responseBody, true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            throw new ShopSavvyException('Failed to decode JSON response: ' . json_last_error_msg());
+        }
+        if (!is_array($data)) {
+            throw new ShopSavvyException('Unexpected JSON response: expected an object');
+        }
+
+        return $data;
+    }
+
+    /**
+     * Execute an HTTP request and return the undecoded response body
+     *
+     * @param string $method HTTP method
+     * @param string $endpoint API endpoint
+     * @param array<string, string> $query Query parameters
+     * @param array<string, mixed>|null $body Request body
+     * @return string Response body
+     * @throws ShopSavvyException if the request fails
+     */
+    private function executeRequestBody(string $method, string $endpoint, array $query = [], ?array $body = null): string
     {
         $url = $this->baseUrl . $endpoint;
 
@@ -462,12 +518,7 @@ class ShopSavvyClient
                 throw $this->createExceptionFromResponse($statusCode, $responseBody);
             }
 
-            $data = json_decode($responseBody, true);
-            if (json_last_error() !== JSON_ERROR_NONE) {
-                throw new ShopSavvyException('Failed to decode JSON response: ' . json_last_error_msg());
-            }
-
-            return $data;
+            return $responseBody;
 
         } catch (RequestException $e) {
             $errorResponse = $e->getResponse();
