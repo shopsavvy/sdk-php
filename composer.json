@@ -1,9 +1,14 @@
 {
     "name": "shopsavvy/shopsavvy-sdk-php",
-    "version": "1.3.0",
     "description": "Official PHP SDK for ShopSavvy Data API - Access product data, pricing, and price history",
-    "keywords": ["shopsavvy", "product-data", "pricing", "e-commerce", "api-client"],
-    "homepage": "https://shopsavvy.com/data",
+    "keywords": [
+        "shopsavvy",
+        "product-data",
+        "pricing",
+        "e-commerce",
+        "api-client"
+    ],
+    "homepage": "https://shopsavvy.com/integrations/sdk-php",
     "license": "MIT",
     "authors": [
         {
@@ -12,13 +17,18 @@
             "homepage": "https://shopsavvy.com"
         }
     ],
+    "support": {
+        "docs": "https://shopsavvy.com/data/documentation",
+        "issues": "https://github.com/shopsavvy/sdk-php/issues",
+        "source": "https://github.com/shopsavvy/sdk-php"
+    },
     "require": {
-        "php": "^8.0",
+        "php": "^8.1",
         "guzzlehttp/guzzle": "^7.0",
         "ext-json": "*"
     },
     "require-dev": {
-        "phpunit/phpunit": "^9.0|^10.0",
+        "phpunit/phpunit": "^10.5",
         "guzzlehttp/psr7": "^2.0",
         "phpstan/phpstan": "^1.0"
     },
