@@ -268,6 +268,44 @@ class ShopSavvyClientHttpTest extends TestCase
         $this->assertSame('', (string) $request->getBody());
     }
 
+    public function testScheduleWithoutRetailerSendsOnlyIdsAndSchedule(): void
+    {
+        $client = $this->client([self::json(['success' => true, 'data' => []])]);
+        $client->scheduleProductMonitoring('611247373064', 'hourly');
+
+        $request = $this->lastRequest();
+        $this->assertSame('PUT', $request->getMethod());
+        $this->assertSame('/v1/products/scheduled', $request->getUri()->getPath());
+        $this->assertSame(['ids' => '611247373064', 'schedule' => 'hourly'], $this->lastQuery());
+        $this->assertSame('', (string) $request->getBody());
+    }
+
+    /**
+     * The endpoint takes several products as a comma-separated `ids` list; the SDK has no
+     * separate batch method, so a comma list passed as the identifier must reach the wire as-is.
+     */
+    public function testScheduleAndUnscheduleSeveralProductsViaCommaSeparatedIds(): void
+    {
+        $client = $this->client([
+            self::json(['success' => true, 'data' => []]),
+            self::json(['success' => true, 'data' => []]),
+        ]);
+
+        $client->scheduleProductMonitoring('611247373064,611247369449', 'weekly', 'bestbuy.com');
+        $this->assertSame('PUT', $this->lastRequest()->getMethod());
+        $this->assertSame('/v1/products/scheduled', $this->lastRequest()->getUri()->getPath());
+        $this->assertSame(
+            ['ids' => '611247373064,611247369449', 'schedule' => 'weekly', 'retailer' => 'bestbuy.com'],
+            $this->lastQuery()
+        );
+
+        $client->removeProductFromSchedule('611247373064,611247369449');
+        $this->assertSame('DELETE', $this->lastRequest()->getMethod());
+        $this->assertSame('/v1/products/scheduled', $this->lastRequest()->getUri()->getPath());
+        $this->assertSame(['ids' => '611247373064,611247369449'], $this->lastQuery());
+        $this->assertSame('', (string) $this->lastRequest()->getBody());
+    }
+
     public function testRemoveFromScheduleSendsIdsWithDelete(): void
     {
         $client = $this->client([self::json(['success' => true, 'data' => []])]);
