@@ -184,7 +184,7 @@ try {
 
 ## Framework integration
 
-- **Laravel**: use [`shopsavvy/laravel-shopsavvy`](https://github.com/shopsavvy/laravel-shopsavvy) for a facade, config file, Blade components and Artisan commands built on this SDK.
+- **Laravel**: [`shopsavvy/laravel-shopsavvy`](https://github.com/shopsavvy/laravel-shopsavvy) adds a facade, config file, Blade components and Artisan commands (it is a standalone package with its own client built on Laravel's HTTP client).
 - **Symfony**: register `ShopSavvy\SDK\ShopSavvyClient` as a service with `$apiKey: '%env(SHOPSAVVY_API_KEY)%'`.
 - **WordPress**: install with Composer in your plugin and store the API key in an option.
 
