@@ -10,9 +10,14 @@ use ShopSavvy\SDK\Exceptions\ShopSavvyException;
 
 class ShopSavvyClientTest extends TestCase
 {
+    // Real keys are ss_live_/ss_test_ + 32 hex characters (the API rejects
+    // anything else); the old fixture 'ss_test_valid_key_12345' contained
+    // underscores in the body and never matched the client's own format check.
+    private const VALID_KEY = 'ss_test_0123456789abcdef0123456789abcdef';
+
     public function testClientCreation(): void
     {
-        $client = new ShopSavvyClient('ss_test_valid_key_12345');
+        $client = new ShopSavvyClient(self::VALID_KEY);
         $this->assertInstanceOf(ShopSavvyClient::class, $client);
     }
     
@@ -35,7 +40,7 @@ class ShopSavvyClientTest extends TestCase
     public function testCustomConfiguration(): void
     {
         $client = new ShopSavvyClient(
-            'ss_test_valid_key_12345',
+            self::VALID_KEY,
             'https://custom.api.com/v1',
             60.0
         );

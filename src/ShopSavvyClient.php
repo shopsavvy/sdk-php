@@ -19,10 +19,8 @@ use ShopSavvy\SDK\Models\ProductDetails;
 use ShopSavvy\SDK\Models\ProductWithOffers;
 use ShopSavvy\SDK\Models\Offer;
 use ShopSavvy\SDK\Models\OfferWithHistory;
-use ShopSavvy\SDK\Models\ScheduleRequest;
 use ShopSavvy\SDK\Models\ScheduleResponse;
 use ShopSavvy\SDK\Models\ScheduledProduct;
-use ShopSavvy\SDK\Models\RemoveRequest;
 use ShopSavvy\SDK\Models\RemoveResponse;
 use ShopSavvy\SDK\Models\UsageInfo;
 
@@ -46,7 +44,7 @@ use ShopSavvy\SDK\Models\UsageInfo;
  */
 class ShopSavvyClient
 {
-    public const VERSION = '1.1.0';
+    public const VERSION = '1.3.0';
     private const DEFAULT_BASE_URL = 'https://api.shopsavvy.com/v1';
     private const API_KEY_PATTERN = '/^ss_(live|test)_[a-zA-Z0-9]+$/';
 
@@ -55,11 +53,18 @@ class ShopSavvyClient
 
     /**
      * Create a new ShopSavvy Data API client
+     *
+     * @param string $apiKey Your Data API key (ss_live_... or ss_test_...)
+     * @param string|null $baseUrl Override the API base URL (defaults to https://api.shopsavvy.com/v1)
+     * @param float $timeout Request timeout in seconds
+     * @param array<string, mixed> $httpOptions Extra Guzzle client options (e.g. 'proxy', 'handler'),
+     *   merged over the SDK defaults. The Authorization and User-Agent headers are always set by the SDK.
      */
     public function __construct(
         private string $apiKey,
         ?string $baseUrl = null,
-        float $timeout = 30.0
+        float $timeout = 30.0,
+        array $httpOptions = []
     ) {
         if (empty(trim($this->apiKey))) {
             throw new \InvalidArgumentException('API key is required. Get one at https://shopsavvy.com/data');
@@ -71,14 +76,14 @@ class ShopSavvyClient
 
         $this->baseUrl = $baseUrl ?? self::DEFAULT_BASE_URL;
 
-        $this->httpClient = new Client([
-            'timeout' => $timeout,
-            'headers' => [
-                'Authorization' => 'Bearer ' . $this->apiKey,
-                'Content-Type' => 'application/json',
-                'User-Agent' => 'ShopSavvy-PHP-SDK/' . self::VERSION,
-            ],
+        $config = array_replace_recursive(['timeout' => $timeout], $httpOptions);
+        $config['headers'] = array_merge($config['headers'] ?? [], [
+            'Authorization' => 'Bearer ' . $this->apiKey,
+            'Accept' => 'application/json',
+            'User-Agent' => 'ShopSavvy-PHP-SDK/' . self::VERSION,
         ]);
+
+        $this->httpClient = new Client($config);
     }
 
     // MARK: - Search
@@ -113,7 +118,7 @@ class ShopSavvyClient
      *
      * @param string $identifier Product identifier (barcode, ASIN, URL, model number, or ShopSavvy product ID)
      * @param string|null $format Response format ('json' or 'csv')
-     * @return ApiResponse<array<ProductDetails>> Product details
+     * @return ApiResponse Product details
      * @throws ShopSavvyException if the API request fails
      */
     public function getProductDetails(string $identifier, ?string $format = null): ApiResponse
@@ -131,7 +136,7 @@ class ShopSavvyClient
      *
      * @param array<string> $identifiers List of product identifiers
      * @param string|null $format Response format ('json' or 'csv')
-     * @return ApiResponse<array<ProductDetails>> List of product details
+     * @return ApiResponse List of product details
      * @throws ShopSavvyException if the API request fails
      */
     public function getProductDetailsBatch(array $identifiers, ?string $format = null): ApiResponse
@@ -152,7 +157,7 @@ class ShopSavvyClient
      * @param string $identifier Product identifier
      * @param string|null $retailer Optional retailer to filter by
      * @param string|null $format Response format ('json' or 'csv')
-     * @return ApiResponse<array<ProductWithOffers>> Current offers
+     * @return ApiResponse Current offers
      * @throws ShopSavvyException if the API request fails
      */
     public function getCurrentOffers(string $identifier, ?string $retailer = null, ?string $format = null): ApiResponse
@@ -174,7 +179,7 @@ class ShopSavvyClient
      * @param array<string> $identifiers List of product identifiers
      * @param string|null $retailer Optional retailer to filter by
      * @param string|null $format Response format ('json' or 'csv')
-     * @return ApiResponse<array<ProductWithOffers>> Map of identifiers to their offers
+     * @return ApiResponse Map of identifiers to their offers
      * @throws ShopSavvyException if the API request fails
      */
     public function getCurrentOffersBatch(array $identifiers, ?string $retailer = null, ?string $format = null): ApiResponse
@@ -200,7 +205,7 @@ class ShopSavvyClient
      * @param string $endDate End date (YYYY-MM-DD format)
      * @param string|null $retailer Optional retailer to filter by
      * @param string|null $format Response format ('json' or 'csv')
-     * @return ApiResponse<array<OfferWithHistory>> Offers with price history
+     * @return ApiResponse Offers with price history
      * @throws ShopSavvyException if the API request fails
      */
     public function getPriceHistory(
@@ -234,29 +239,33 @@ class ShopSavvyClient
     /**
      * Schedule product monitoring
      *
+     * Sends PUT /products/scheduled?ids=&schedule=&retailer=. The endpoint reads
+     * query parameters only; a JSON body (what this method used to send) is
+     * ignored, so every call failed with "'ids' is required".
+     *
      * @param string $identifier Product identifier
      * @param string $frequency How often to refresh ('hourly', 'daily', 'weekly')
      * @param string|null $retailer Optional retailer to monitor
-     * @return ApiResponse<ScheduleResponse> Scheduling confirmation
+     * @return ApiResponse The scheduled products (each product with its `schedule`)
      * @throws ShopSavvyException if the API request fails
      */
     public function scheduleProductMonitoring(string $identifier, string $frequency, ?string $retailer = null): ApiResponse
     {
-        $body = [
-            'identifier' => $identifier,
-            'frequency' => $frequency,
+        $query = [
+            'ids' => $identifier,
+            'schedule' => $frequency,
         ];
         if ($retailer !== null) {
-            $body['retailer'] = $retailer;
+            $query['retailer'] = $retailer;
         }
 
-        return $this->executeRequest('POST', '/products/schedule', [], $body);
+        return $this->executeRequest('PUT', '/products/scheduled', $query);
     }
 
     /**
      * Get all scheduled products
      *
-     * @return ApiResponse<array<ScheduledProduct>> List of scheduled products
+     * @return ApiResponse List of scheduled products
      * @throws ShopSavvyException if the API request fails
      */
     public function getScheduledProducts(): ApiResponse
@@ -267,15 +276,15 @@ class ShopSavvyClient
     /**
      * Remove product from monitoring schedule
      *
+     * Sends DELETE /products/scheduled?ids= (query parameters, like scheduling).
+     *
      * @param string $identifier Product identifier to remove
-     * @return ApiResponse<RemoveResponse> Removal confirmation
+     * @return ApiResponse Removal confirmation
      * @throws ShopSavvyException if the API request fails
      */
     public function removeProductFromSchedule(string $identifier): ApiResponse
     {
-        $body = ['identifier' => $identifier];
-
-        return $this->executeRequest('DELETE', '/products/schedule', [], $body);
+        return $this->executeRequest('DELETE', '/products/scheduled', ['ids' => $identifier]);
     }
 
     // MARK: - Usage
@@ -283,7 +292,7 @@ class ShopSavvyClient
     /**
      * Get API usage information
      *
-     * @return ApiResponse<UsageInfo> Current usage and credit information
+     * @return ApiResponse Current usage and credit information
      * @throws ShopSavvyException if the API request fails
      */
     public function getUsage(): ApiResponse
@@ -329,22 +338,34 @@ class ShopSavvyClient
 
     /**
      * Poll for async batch job results
+     *
+     * @return array<string, mixed>
      */
     public function getBatchStatus(string $batchId): array
     {
         return $this->executeRequestRaw('GET', "/batch/{$batchId}");
     }
 
+    /**
+     * @param array<int, string> $events e.g. ['price_drop', 'availability_change', 'schedule_completion']
+     * @return array<string, mixed>
+     */
     public function createWebhook(string $url, array $events): array
     {
         return $this->executeRequestRaw('POST', '/webhooks', [], ['url' => $url, 'events' => $events]);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function listWebhooks(): array
     {
         return $this->executeRequestRaw('GET', '/webhooks');
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function testWebhook(string $webhookId): array
     {
         return $this->executeRequestRaw('POST', "/webhooks/{$webhookId}/test");
@@ -373,6 +394,9 @@ class ShopSavvyClient
         return $this->executeRequestRaw('PUT', "/webhooks/{$webhookId}", [], $body);
     }
 
+    /**
+     * @return array<string, mixed>
+     */
     public function deleteWebhook(string $webhookId): array
     {
         return $this->executeRequestRaw('DELETE', "/webhooks/{$webhookId}");
@@ -437,10 +461,12 @@ class ShopSavvyClient
             return $data;
 
         } catch (RequestException $e) {
-            if ($e->hasResponse()) {
-                $statusCode = $e->getResponse()->getStatusCode();
-                $responseBody = $e->getResponse()->getBody()->getContents();
-                throw $this->createExceptionFromResponse($statusCode, $responseBody);
+            $errorResponse = $e->getResponse();
+            if ($errorResponse !== null) {
+                throw $this->createExceptionFromResponse(
+                    $errorResponse->getStatusCode(),
+                    (string) $errorResponse->getBody()
+                );
             }
 
             throw new ShopSavvyNetworkException('Network error: ' . $e->getMessage(), 0, $e);
@@ -464,11 +490,11 @@ class ShopSavvyClient
         }
 
         return match ($statusCode) {
-            401 => new ShopSavvyAuthenticationException('Authentication failed. Check your API key.'),
-            404 => new ShopSavvyNotFoundException('Resource not found'),
-            422 => new ShopSavvyValidationException('Request validation failed. Check your parameters.'),
-            429 => new ShopSavvyRateLimitException('Rate limit exceeded. Please slow down your requests.'),
-            default => new ShopSavvyException("HTTP $statusCode: $errorMessage"),
+            401 => new ShopSavvyAuthenticationException("Authentication failed: $errorMessage", $statusCode),
+            404 => new ShopSavvyNotFoundException("Not found: $errorMessage", $statusCode),
+            400, 422 => new ShopSavvyValidationException("Invalid request: $errorMessage", $statusCode),
+            429 => new ShopSavvyRateLimitException("Rate limit exceeded: $errorMessage", $statusCode),
+            default => new ShopSavvyException("HTTP $statusCode: $errorMessage", $statusCode),
         };
     }
 }
