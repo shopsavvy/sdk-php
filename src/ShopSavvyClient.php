@@ -44,7 +44,7 @@ use ShopSavvy\SDK\Models\UsageInfo;
  */
 class ShopSavvyClient
 {
-    public const VERSION = '1.3.0';
+    public const VERSION = '1.4.0';
     private const DEFAULT_BASE_URL = 'https://api.shopsavvy.com/v1';
     private const API_KEY_PATTERN = '/^ss_(live|test)_[a-zA-Z0-9]+$/';
 
