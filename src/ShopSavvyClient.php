@@ -18,7 +18,7 @@ use ShopSavvy\SDK\Models\ProductSearchResult;
 use ShopSavvy\SDK\Models\ProductDetails;
 use ShopSavvy\SDK\Models\ProductWithOffers;
 use ShopSavvy\SDK\Models\Offer;
-use ShopSavvy\SDK\Models\OfferWithHistory;
+use ShopSavvy\SDK\Models\PriceHistoryResponse;
 use ShopSavvy\SDK\Models\ScheduleResponse;
 use ShopSavvy\SDK\Models\ScheduledProduct;
 use ShopSavvy\SDK\Models\RemoveResponse;
@@ -200,12 +200,16 @@ class ShopSavvyClient
     /**
      * Get price history for a product
      *
-     * @param string $identifier Product identifier
+     * The response holds one entry per product found; each carries every product
+     * field plus an `offers` list, and each offer carries a `history` list of
+     * price points (newest first), each with its own `currency`.
+     *
+     * @param string $identifier Product identifier (or several, comma-separated)
      * @param string $startDate Start date (YYYY-MM-DD format)
      * @param string $endDate End date (YYYY-MM-DD format)
-     * @param string|null $retailer Optional retailer to filter by
+     * @param string|null $retailer Optional retailer domain to filter by (e.g. 'amazon.com')
      * @param string|null $format Response format ('json' or 'csv')
-     * @return ApiResponse Offers with price history
+     * @return PriceHistoryResponse Products, each with its offers and their price history
      * @throws ShopSavvyException if the API request fails
      */
     public function getPriceHistory(
@@ -214,7 +218,7 @@ class ShopSavvyClient
         string $endDate,
         ?string $retailer = null,
         ?string $format = null
-    ): ApiResponse {
+    ): PriceHistoryResponse {
         // Wire params are 'start'/'end' — what GET /products/offers/history
         // reads, and what the OpenAPI spec and public docs document. The old
         // 'start_date'/'end_date' names came from the MCP tool's argument
@@ -231,7 +235,12 @@ class ShopSavvyClient
             $query['format'] = $format;
         }
 
-        return $this->executeRequest('GET', '/products/offers/history', $query);
+        // Typed per product, not per offer: `data` is a list of products, each with
+        // `offers`, each offer with `history`. Earlier releases documented the result
+        // as a flat list of offers-with-history, which the API has never returned.
+        return PriceHistoryResponse::fromArray(
+            $this->executeRequestRaw('GET', '/products/offers/history', $query)
+        );
     }
 
     // MARK: - Monitoring

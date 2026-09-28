@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace ShopSavvy\SDK\Models;
 
 /**
- * Offer returned by getPriceHistory(), i.e. one carrying its `history` array.
+ * One offer inside a getPriceHistory() product (ProductWithPriceHistory::$offers): every
+ * field of a current offer plus its `history` array of price points, newest first.
+ * The response's top-level `data` is a list of products, not of these offers.
  *
  * `fromArray` used to read a `price_history` key. The API has never sent one — history has
  * always arrived under `history` — so the `isset()` guard was always false, `array_map` never

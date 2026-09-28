@@ -8,9 +8,12 @@ namespace ShopSavvy\SDK\Models;
  * Historical price point.
  *
  * The timestamp field is `timestamp`, matching the parent Offer's own `timestamp` and the
- * real wire shape ({availability, price, timestamp}). Every SDK in the fleet read it from a
- * `date` key — one the API has never sent — until 2026-08-10
+ * real wire shape ({availability, price, currency, timestamp}). Every SDK in the fleet read
+ * it from a `date` key — one the API has never sent — until 2026-08-10
  * (ShopSavvy prospector-audit s28-t2-2 / s28-t2-3).
+ *
+ * `price` is always a positive number and `timestamp` is always present (the API drops
+ * archived points without a real price); `availability` is omitted when unknown.
  */
 class PriceHistoryEntry
 {

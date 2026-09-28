@@ -16,6 +16,10 @@ use ShopSavvy\SDK\Exceptions\ShopSavvyNotFoundException;
 use ShopSavvy\SDK\Exceptions\ShopSavvyRateLimitException;
 use ShopSavvy\SDK\Exceptions\ShopSavvyValidationException;
 use ShopSavvy\SDK\Models\ApiResponse;
+use ShopSavvy\SDK\Models\OfferWithHistory;
+use ShopSavvy\SDK\Models\PriceHistoryEntry;
+use ShopSavvy\SDK\Models\PriceHistoryResponse;
+use ShopSavvy\SDK\Models\ProductWithPriceHistory;
 use ShopSavvy\SDK\Models\ProductDetails;
 use ShopSavvy\SDK\ShopSavvyClient;
 
@@ -152,6 +156,101 @@ class ShopSavvyClientHttpTest extends TestCase
             ['ids' => '611247373064', 'start' => '2026-01-01', 'end' => '2026-01-31'],
             $this->lastQuery()
         );
+    }
+
+    public function testPriceHistorySendsRetailerFilter(): void
+    {
+        $client = $this->client([self::json(['success' => true, 'data' => []])]);
+        $client->getPriceHistory('611247373064', '2026-01-01', '2026-01-31', 'amazon.com');
+
+        $this->assertSame(
+            ['ids' => '611247373064', 'start' => '2026-01-01', 'end' => '2026-01-31', 'retailer' => 'amazon.com'],
+            $this->lastQuery()
+        );
+    }
+
+    /**
+     * Feeds a response in the exact shape GET /products/offers/history returns (one entry
+     * per product, each with offers, each offer with history) through the real parser.
+     */
+    public function testPriceHistoryParsesProductsOffersAndHistory(): void
+    {
+        $body = (string) file_get_contents(__DIR__ . '/fixture-price-history-response.json');
+        $client = $this->client([new Response(200, ['Content-Type' => 'application/json'], $body)]);
+
+        $response = $client->getPriceHistory('611247373064,611247369449', '2022-11-20', '2022-11-27');
+
+        $this->assertInstanceOf(PriceHistoryResponse::class, $response);
+        $this->assertTrue($response->success);
+        $this->assertSame(14, $response->creditsUsed());
+        $this->assertSame(986, $response->creditsRemaining());
+        $this->assertSame(999, $response->meta?->rateLimitRemaining);
+        $this->assertCount(2, $response->data);
+
+        // Product 1: full product fields + two offers
+        $mini = $response->data[0];
+        $this->assertInstanceOf(ProductWithPriceHistory::class, $mini);
+        $this->assertSame('Keurig K-Mini Single Serve Coffee Maker, Black', $mini->title);
+        $this->assertSame('3ONn300xybP3y66ibqc1', $mini->shopsavvy);
+        $this->assertSame('611247373064', $mini->barcode);
+        $this->assertSame('B07G14HTBZ', $mini->amazon);
+        $this->assertSame('K-MINI', $mini->model);
+        $this->assertSame('Keurig K-Mini', $mini->titleShort);
+        $this->assertSame(['value' => 4.6, 'count' => 51234], $mini->rating);
+        $this->assertSame('B07G14HTBZ', $mini->identifiers['amazon'] ?? null);
+        $this->assertCount(2, $mini->offers);
+
+        $amazon = $mini->offers[0];
+        $this->assertInstanceOf(OfferWithHistory::class, $amazon);
+        $this->assertSame('0IUouCFtZEhxeOablTPl', $amazon->id);
+        $this->assertSame('Amazon', $amazon->retailer);
+        $this->assertSame(74.96, $amazon->price);
+        $this->assertSame('USD', $amazon->currency);
+        $this->assertSame('in', $amazon->availability);
+        $this->assertSame('new', $amazon->condition);
+        $this->assertSame('ACME Deals', $amazon->seller);
+        $this->assertSame('https://www.amazon.com/dp/B07G14HTBZ?m=A1GKQADQC2VI6E', $amazon->url);
+        $this->assertSame('2022-11-27T22:36:33.236Z', $amazon->timestamp);
+        $this->assertCount(3, $amazon->history);
+
+        $newest = $amazon->history[0];
+        $this->assertInstanceOf(PriceHistoryEntry::class, $newest);
+        $this->assertSame('2022-11-27T22:36:33.236Z', $newest->timestamp);
+        $this->assertSame(74.96, $newest->price);
+        $this->assertSame('USD', $newest->currency);
+        $this->assertSame('in', $newest->availability);
+        $this->assertSame('out', $amazon->history[1]->availability);
+        $this->assertSame(70.99, $amazon->history[1]->price);
+
+        // A point with no recorded currency and unknown (omitted) availability
+        $oldest = $amazon->history[2];
+        $this->assertSame(79.99, $oldest->price);
+        $this->assertSame('2022-11-21T08:15:00.000Z', $oldest->timestamp);
+        $this->assertNull($oldest->currency);
+        $this->assertNull($oldest->availability);
+
+        // Offer with null seller and omitted availability
+        $bestBuy = $mini->offers[1];
+        $this->assertSame('Best Buy', $bestBuy->retailer);
+        $this->assertNull($bestBuy->seller);
+        $this->assertNull($bestBuy->availability);
+        $this->assertSame(59.99, $bestBuy->price);
+        $this->assertCount(2, $bestBuy->history);
+        $this->assertSame(64.99, $bestBuy->history[1]->price);
+
+        // Product 2: nullable product fields, an offer with an empty history
+        $elite = $response->data[1];
+        $this->assertSame('DrKWneG0MpFlZpwZXNYa', $elite->shopsavvy);
+        $this->assertSame('611247369449', $elite->barcode);
+        $this->assertNull($elite->amazon);
+        $this->assertNull($elite->category);
+        $this->assertNull($elite->color);
+        $this->assertNull($elite->mpn);
+        $this->assertSame([], $elite->images);
+        $this->assertCount(1, $elite->offers);
+        $this->assertSame('eBay', $elite->offers[0]->retailer);
+        $this->assertSame(89.5, $elite->offers[0]->price);
+        $this->assertSame([], $elite->offers[0]->history);
     }
 
     public function testScheduleSendsQueryParametersWithPut(): void
