@@ -5,38 +5,41 @@ declare(strict_types=1);
 namespace ShopSavvy\SDK\Models;
 
 /**
- * API response wrapper
- *
- * `data` holds the decoded JSON `data` field as returned by the API (arrays,
- * not model objects), e.g. a list of product arrays from getProductDetails()
- * or a list of product arrays each carrying an `offers` list from
- * getCurrentOffers().
+ * Product search result with pagination
  */
-class ApiResponse
+class ProductSearchResult
 {
     /**
-     * @param mixed $data
+     * @param array<ProductDetails> $data
      */
     public function __construct(
         public readonly bool $success,
-        public readonly mixed $data,
-        public readonly ?string $message = null,
+        public readonly array $data,
+        public readonly ?PaginationInfo $pagination = null,
         public readonly ?ApiMeta $meta = null
     ) {
     }
 
     /**
-     * Create ApiResponse from array data
+     * Create ProductSearchResult from array data
      *
      * @param array<string, mixed> $data
      * @return self
      */
     public static function fromArray(array $data): self
     {
+        $products = [];
+        if (isset($data['data']) && is_array($data['data'])) {
+            $products = array_map(
+                fn(array $product) => ProductDetails::fromArray($product),
+                $data['data']
+            );
+        }
+
         return new self(
             $data['success'] ?? true,
-            $data['data'] ?? null,
-            $data['message'] ?? null,
+            $products,
+            isset($data['pagination']) ? PaginationInfo::fromArray($data['pagination']) : null,
             isset($data['meta']) ? ApiMeta::fromArray($data['meta']) : null
         );
     }

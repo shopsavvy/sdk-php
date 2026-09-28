@@ -5,12 +5,18 @@ declare(strict_types=1);
 namespace ShopSavvy\SDK\Models;
 
 /**
- * Product offer model
+ * Offer returned by getPriceHistory(), i.e. one carrying its `history` array.
+ *
+ * `fromArray` used to read a `price_history` key. The API has never sent one — history has
+ * always arrived under `history` — so the `isset()` guard was always false, `array_map` never
+ * ran, and `$history` stayed at its `[]` default for every product, retailer and date range.
+ * No exception, no warning: getPriceHistory() succeeded and always reported zero price points
+ * (ShopSavvy prospector-audit s28-t2-3).
  */
-class Offer
+class OfferWithHistory
 {
     /**
-     * @param array<PriceHistoryEntry>|null $history
+     * @param array<PriceHistoryEntry> $history
      */
     public function __construct(
         public readonly string $id,
@@ -22,19 +28,19 @@ class Offer
         public readonly ?string $url = null,
         public readonly ?string $seller = null,
         public readonly ?string $timestamp = null,
-        public readonly ?array $history = null
+        public readonly array $history = []
     ) {
     }
 
     /**
-     * Create Offer from array data
+     * Create OfferWithHistory from array data
      *
      * @param array<string, mixed> $data
      * @return self
      */
     public static function fromArray(array $data): self
     {
-        $history = null;
+        $history = [];
         if (isset($data['history']) && is_array($data['history'])) {
             $history = array_map(
                 fn(array $point) => PriceHistoryEntry::fromArray($point),
@@ -54,31 +60,5 @@ class Offer
             $data['timestamp'] ?? null,
             $history
         );
-    }
-
-    // Backward-compatible aliases
-
-    /**
-     * @deprecated Use id instead
-     */
-    public function getOfferId(): string
-    {
-        return $this->id;
-    }
-
-    /**
-     * @deprecated Use url instead
-     */
-    public function getOfferUrl(): ?string
-    {
-        return $this->url;
-    }
-
-    /**
-     * @deprecated Use timestamp instead
-     */
-    public function getLastUpdated(): ?string
-    {
-        return $this->timestamp;
     }
 }
