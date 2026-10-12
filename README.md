@@ -8,7 +8,10 @@ Official PHP SDK for the [ShopSavvy Data API](https://shopsavvy.com/data): produ
 
 ## Installation
 
+The package is not on Packagist yet, so add this repository first:
+
 ```bash
+composer config repositories.shopsavvy vcs https://github.com/shopsavvy/sdk-php
 composer require shopsavvy/shopsavvy-sdk-php
 ```
 

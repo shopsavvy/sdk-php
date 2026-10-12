@@ -6,7 +6,7 @@ Context for coding agents (Claude Code, Codex, Cursor, Copilot and others) worki
 
 The official SDK for the [ShopSavvy Data API](https://shopsavvy.com/data) in PHP (8.1+). It wraps the REST API at `https://api.shopsavvy.com/v1`: look up products by barcode (UPC/EAN/ISBN), ASIN, URL, model number or MPN, and get current retailer offers, price history, scheduled refreshes and usage.
 
-- Package: `shopsavvy/shopsavvy-sdk-php` on Packagist (git tags). Install: `composer require shopsavvy/shopsavvy-sdk-php`
+- Package: `shopsavvy/shopsavvy-sdk-php`, installed from this GitHub repository (git tags; not on Packagist yet): `composer config repositories.shopsavvy vcs https://github.com/shopsavvy/sdk-php` then `composer require shopsavvy/shopsavvy-sdk-php`
 - API docs: https://shopsavvy.com/data/documentation
 - OpenAPI spec (the contract this SDK follows): https://api.shopsavvy.com/v1/openapi.json
 - Error codes: https://shopsavvy.com/data/documentation/errors
