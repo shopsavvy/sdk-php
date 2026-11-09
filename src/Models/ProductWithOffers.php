@@ -12,6 +12,7 @@ class ProductWithOffers
     /**
      * @param array<string>|null $images
      * @param array<Offer> $offers
+     * @param array<InStorePrice> $inStorePrices user-collected in-store prices from shoppers' receipts
      */
     public function __construct(
         public readonly string $title,
@@ -24,7 +25,8 @@ class ProductWithOffers
         public readonly ?string $model = null,
         public readonly ?string $mpn = null,
         public readonly ?string $color = null,
-        public readonly array $offers = []
+        public readonly array $offers = [],
+        public readonly array $inStorePrices = []
     ) {
     }
 
@@ -44,6 +46,14 @@ class ProductWithOffers
             );
         }
 
+        $inStorePrices = [];
+        if (isset($data['in_store_prices']) && is_array($data['in_store_prices'])) {
+            $inStorePrices = array_map(
+                fn(array $inStore) => InStorePrice::fromArray($inStore),
+                $data['in_store_prices']
+            );
+        }
+
         return new self(
             $data['title'],
             $data['shopsavvy'],
@@ -55,7 +65,8 @@ class ProductWithOffers
             self::stringOrNull($data['model'] ?? null),
             self::stringOrNull($data['mpn'] ?? null),
             $data['color'] ?? null,
-            $offers
+            $offers,
+            $inStorePrices
         );
     }
 

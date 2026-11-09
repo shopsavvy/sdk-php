@@ -6,6 +6,18 @@
 
 Official PHP SDK for the [ShopSavvy Data API](https://shopsavvy.com/data): product details, current offers across retailers, price history, deals, and scheduled price monitoring. Works in any PHP 8.1+ application, including Laravel, Symfony and WordPress.
 
+### In-Store Prices (user-collected)
+
+Each product from the current-offers call also carries `in_store_prices`: shelf prices physical stores charged, read from receipts ShopSavvy app users scanned. Every entry is labeled `source: "user-collected"` and has the retailer, the store's address and coordinates, the price and the receipt date (`observed_on`). It is a price on that day, not current stock, and says nothing about the shopper. Empty when none are on file.
+
+```php
+$response = $client->getCurrentOffers('011110838360');
+$product = \ShopSavvy\SDK\Models\ProductWithOffers::fromArray($response->data[0]);
+foreach ($product->inStorePrices as $inStore) {
+    echo "{$inStore->retailer} ({$inStore->address}): \${$inStore->price} on {$inStore->observedOn}\n";
+}
+```
+
 ## Installation
 
 The package is not on Packagist yet, so add this repository first:

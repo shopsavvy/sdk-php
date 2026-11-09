@@ -16,6 +16,8 @@ use ShopSavvy\SDK\Exceptions\ShopSavvyNotFoundException;
 use ShopSavvy\SDK\Exceptions\ShopSavvyRateLimitException;
 use ShopSavvy\SDK\Exceptions\ShopSavvyValidationException;
 use ShopSavvy\SDK\Models\ApiResponse;
+use ShopSavvy\SDK\Models\InStorePrice;
+use ShopSavvy\SDK\Models\ProductWithOffers;
 use ShopSavvy\SDK\Models\OfferWithHistory;
 use ShopSavvy\SDK\Models\PriceHistoryEntry;
 use ShopSavvy\SDK\Models\PriceHistoryResponse;
@@ -148,6 +150,30 @@ class ShopSavvyClientHttpTest extends TestCase
         $this->assertInstanceOf(ApiResponse::class, $response);
         $this->assertSame(58.86, $response->data[0]['offers'][0]['price']);
         $this->assertSame(2, $response->creditsUsed());
+    }
+
+    public function testCurrentOffersCarryUserCollectedInStorePrices(): void
+    {
+        $fixture = json_decode((string) file_get_contents(__DIR__ . '/fixtures/offers-in-store-response.json'), true, 512, JSON_THROW_ON_ERROR);
+        $client = $this->client([self::json($fixture)]);
+
+        $response = $client->getCurrentOffers('011110838360');
+
+        $this->assertSame('/v1/products/offers', $this->lastRequest()->getUri()->getPath());
+        $product = ProductWithOffers::fromArray($response->data[0]);
+        $this->assertCount(1, $product->inStorePrices);
+        $inStore = $product->inStorePrices[0];
+        $this->assertInstanceOf(InStorePrice::class, $inStore);
+        $this->assertSame('user-collected', $inStore->source);
+        $this->assertSame('Kroger', $inStore->retailer);
+        $this->assertSame('1014 Vine St, Cincinnati, OH 45202, USA', $inStore->address);
+        $this->assertSame(39.1086, $inStore->latitude);
+        $this->assertSame(3.49, $inStore->price);
+        $this->assertSame('2026-11-07', $inStore->observedOn);
+        $this->assertSame('Walmart', $product->offers[0]->retailer);
+
+        unset($fixture['data'][0]['in_store_prices']);
+        $this->assertSame([], ProductWithOffers::fromArray($fixture['data'][0])->inStorePrices);
     }
 
     public function testPriceHistorySendsStartAndEnd(): void
