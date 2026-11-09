@@ -249,6 +249,8 @@ composer phpstan    # static analysis, level 8
 ## Links
 
 - [Data API documentation](https://shopsavvy.com/data/documentation)
+- [Postman collection](https://shopsavvy.com/templates/data-api-postman-collection)
+- [Free UPC lookup](https://shopsavvy.com/tools/upc-lookup)
 - [Integration page](https://shopsavvy.com/integrations/sdk-php)
 - [Packagist](https://packagist.org/packages/shopsavvy/shopsavvy-sdk-php)
 - [Issues](https://github.com/shopsavvy/sdk-php/issues)
