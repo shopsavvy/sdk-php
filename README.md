@@ -29,7 +29,7 @@ composer require shopsavvy/shopsavvy-sdk-php
 
 Requires PHP 8.1+ and `ext-json`. Guzzle 7 is installed automatically.
 
-Get an API key at [shopsavvy.com/data](https://shopsavvy.com/data).
+Get an API key at [shopsavvy.com/data/api-keys](https://shopsavvy.com/data/api-keys) after starting a plan at [shopsavvy.com/data](https://shopsavvy.com/data), then `export SHOPSAVVY_API_KEY=ss_live_...`.
 
 ## Quick start
 
@@ -43,20 +43,52 @@ use ShopSavvy\SDK\Exceptions\ShopSavvyException;
 $client = new ShopSavvyClient(getenv('SHOPSAVVY_API_KEY'));
 
 try {
+    // Keurig K-Mini, looked up by barcode
     $response = $client->getCurrentOffers('611247373064');
 
-    foreach ($response->data as $product) {
-        echo $product['title'] . "\n";
+    $offers = array_filter($response->data[0]['offers'], fn ($o) => isset($o['price']));
+    usort($offers, fn ($a, $b) => $a['price'] <=> $b['price']);
+    $cheapest = $offers[0];
 
-        $offers = $product['offers'];
-        usort($offers, fn ($a, $b) => $a['price'] <=> $b['price']);
-
-        foreach ($offers as $offer) {
-            echo "  {$offer['retailer']}: {$offer['price']} ({$offer['condition']})\n";
-        }
-    }
+    echo "Cheapest: {$cheapest['price']} {$cheapest['currency']} at {$cheapest['retailer']}\n";
 } catch (ShopSavvyException $e) {
     echo 'ShopSavvy error: ' . $e->getMessage() . "\n";
+}
+```
+
+## Errors, rate limits and credits
+
+Every API error is thrown as a `ShopSavvyException` (or a subclass: `ShopSavvyAuthenticationException`,
+`ShopSavvyNotFoundException`, `ShopSavvyValidationException`, `ShopSavvyRateLimitException`,
+`ShopSavvyCreditsExhaustedException`). Each carries `getMessage()`, `getStatusCode()`, and the public properties
+`$errorCode`, `$action`, `$docsUrl`, `$requestId` and `$retryAfterSeconds`. (`getCode()` is still the integer HTTP
+status; the API's string code is `$errorCode`.) Catch the class or branch on `$errorCode`, not on the HTTP status: a
+rate limit and exhausted credits both arrive as HTTP 429.
+
+- `ShopSavvyRateLimitException` (`ERR_RATE_LIMIT`): wait `$retryAfterSeconds`, then retry.
+- `ShopSavvyCreditsExhaustedException` (`ERR_CREDITS_EXHAUSTED`): do not retry. Credits return when the billing period resets or the plan is upgraded. It is not a `ShopSavvyRateLimitException`.
+
+The SDK never retries on its own.
+
+```php
+use ShopSavvy\SDK\ShopSavvyClient;
+use ShopSavvy\SDK\Exceptions\ShopSavvyCreditsExhaustedException;
+use ShopSavvy\SDK\Exceptions\ShopSavvyException;
+use ShopSavvy\SDK\Exceptions\ShopSavvyRateLimitException;
+
+$client = new ShopSavvyClient(getenv('SHOPSAVVY_API_KEY'));
+
+try {
+    $response = $client->getCurrentOffers('611247373064');
+} catch (ShopSavvyRateLimitException $e) {
+    sleep($e->retryAfterSeconds ?? 1);
+    $response = $client->getCurrentOffers('611247373064'); // retry once
+} catch (ShopSavvyCreditsExhaustedException $e) {
+    echo "Credits are used up. Retrying will not help; wait for the reset or upgrade the plan.\n";
+} catch (ShopSavvyException $e) {
+    echo "{$e->errorCode}: {$e->getMessage()}\n";
+    echo "Fix: {$e->action}\n";
+    echo "Docs: {$e->docsUrl}\n";
 }
 ```
 
