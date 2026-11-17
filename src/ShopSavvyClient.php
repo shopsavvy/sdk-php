@@ -7,6 +7,7 @@ namespace ShopSavvy\SDK;
 use GuzzleHttp\Client;
 use GuzzleHttp\Exception\GuzzleException;
 use GuzzleHttp\Exception\RequestException;
+use ShopSavvy\SDK\Exceptions\ShopSavvyCreditsExhaustedException;
 use ShopSavvy\SDK\Exceptions\ShopSavvyException;
 use ShopSavvy\SDK\Exceptions\ShopSavvyAuthenticationException;
 use ShopSavvy\SDK\Exceptions\ShopSavvyNotFoundException;
@@ -45,7 +46,7 @@ use ShopSavvy\SDK\Models\UsageInfo;
  */
 class ShopSavvyClient
 {
-    public const VERSION = '1.5.0';
+    public const VERSION = '1.6.0';
     private const DEFAULT_BASE_URL = 'https://api.shopsavvy.com/v1';
     private const API_KEY_PATTERN = '/^ss_(live|test)_[a-zA-Z0-9]+$/';
 
@@ -515,7 +516,7 @@ class ShopSavvyClient
             $responseBody = $response->getBody()->getContents();
 
             if ($statusCode < 200 || $statusCode >= 300) {
-                throw $this->createExceptionFromResponse($statusCode, $responseBody);
+                throw $this->createExceptionFromResponse($statusCode, $responseBody, $response->getHeaderLine('Retry-After'));
             }
 
             return $responseBody;
@@ -525,7 +526,8 @@ class ShopSavvyClient
             if ($errorResponse !== null) {
                 throw $this->createExceptionFromResponse(
                     $errorResponse->getStatusCode(),
-                    (string) $errorResponse->getBody()
+                    (string) $errorResponse->getBody(),
+                    $errorResponse->getHeaderLine('Retry-After')
                 );
             }
 
@@ -538,23 +540,42 @@ class ShopSavvyClient
     /**
      * Create an appropriate exception from an HTTP response
      */
-    private function createExceptionFromResponse(int $statusCode, string $responseBody): ShopSavvyException
+    private function createExceptionFromResponse(int $statusCode, string $responseBody, string $retryAfterHeader = ''): ShopSavvyException
     {
         $errorMessage = 'Unknown error';
 
         $data = json_decode($responseBody, true);
-        if (json_last_error() === JSON_ERROR_NONE && isset($data['error'])) {
+        $isObject = json_last_error() === JSON_ERROR_NONE && is_array($data);
+        if ($isObject && isset($data['error']) && is_string($data['error'])) {
             $errorMessage = $data['error'];
         } elseif (!empty($responseBody)) {
             $errorMessage = $responseBody;
         }
 
+        $detail = $isObject && isset($data['error_detail']) && is_array($data['error_detail']) ? $data['error_detail'] : [];
+        $meta = $isObject && isset($data['meta']) && is_array($data['meta']) ? $data['meta'] : [];
+        $str = static fn (mixed $v): ?string => is_string($v) ? $v : null;
+        $code = $str($detail['code'] ?? null);
+        $fields = [
+            'errorCode' => $code,
+            'action' => $str($detail['action'] ?? null),
+            'docsUrl' => $str($detail['docs_url'] ?? null),
+            'requestId' => $str($meta['request_id'] ?? null),
+            'retryAfterSeconds' => ctype_digit(trim($retryAfterHeader)) ? (int) trim($retryAfterHeader) : null,
+        ];
+
+        if ($code === 'ERR_CREDITS_EXHAUSTED') {
+            return new ShopSavvyCreditsExhaustedException("Credits exhausted: $errorMessage", $statusCode, null, ...$fields);
+        }
+        if ($code === 'ERR_RATE_LIMIT' || ($code === null && $statusCode === 429)) {
+            return new ShopSavvyRateLimitException("Rate limit exceeded: $errorMessage", $statusCode, null, ...$fields);
+        }
+
         return match ($statusCode) {
-            401 => new ShopSavvyAuthenticationException("Authentication failed: $errorMessage", $statusCode),
-            404 => new ShopSavvyNotFoundException("Not found: $errorMessage", $statusCode),
-            400, 422 => new ShopSavvyValidationException("Invalid request: $errorMessage", $statusCode),
-            429 => new ShopSavvyRateLimitException("Rate limit exceeded: $errorMessage", $statusCode),
-            default => new ShopSavvyException("HTTP $statusCode: $errorMessage", $statusCode),
+            401 => new ShopSavvyAuthenticationException("Authentication failed: $errorMessage", $statusCode, null, ...$fields),
+            404 => new ShopSavvyNotFoundException("Not found: $errorMessage", $statusCode, null, ...$fields),
+            400, 422 => new ShopSavvyValidationException("Invalid request: $errorMessage", $statusCode, null, ...$fields),
+            default => new ShopSavvyException("HTTP $statusCode: $errorMessage", $statusCode, null, ...$fields),
         };
     }
 }
